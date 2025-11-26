@@ -1,3 +1,7 @@
+/*
+** See end of file for license information.
+*/
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // BEGIN HEADER GUARD
@@ -24,6 +28,10 @@
 
 #if !defined(FHSTRING_DEFAULT_BUILDER_CAPACITY)
 #  define FHSTRING_DEFAULT_BUILDER_CAPACITY 128
+#endif
+
+#if !defined(FHSTRING_DEFAULT_ID_STATE_CAPACITY)
+#  define FHSTRING_DEFAULT_ID_STATE_CAPACITY 32
 #endif
 
 #if !defined(FHSTRING_DEFAULT_BASE_STRING)
@@ -76,6 +84,10 @@ typedef fhstring_u8 fhstring_bool;
 
 //
 
+#if !defined(FHString_Allocator)
+typedef void FHString_Allocator;
+#endif
+
 #if !defined(FHString)
 typedef struct FHString {
     char *data;
@@ -87,7 +99,7 @@ typedef struct FHString {
 
 #if !defined(FHString_Builder)
 typedef struct FHString_Builder {
-    void *allocator;
+    FHString_Allocator *allocator;
     char *data;
     FHSTRING_FIELD_ALIAS(fhstring_i32, count, length);
     fhstring_i32 capacity;
@@ -105,9 +117,23 @@ typedef fhstring_i32 FHString_ID;
 #  define FHString_ID(...) fhstring_id_get(__VA_ARGS__)
 #endif
 
+#if !defined(FHString_ID_Entry)
+typedef struct FHString_ID_Entry {
+    fhstring_i64 offset;
+    FHString_ID id;
+    fhstring_i32 length;
+} FHString_ID_Entry;
+
+#  define FHString_ID_Entry(...) fhstring_id_entry_set(__VA_ARGS__)
+#endif
+
 #if !defined(FHString_ID_State)
 typedef struct FHString_ID_State {
-    FHString_Builder builder;
+    FHString_Builder allocated_text;
+    FHString_Allocator *allocator;
+    FHString_ID_Entry *entries;
+    fhstring_i32 entry_count;
+    fhstring_i32 entry_capacity;
     FHString_ID last_used_id;
 } FHString_ID_State;
 
@@ -141,7 +167,7 @@ FHSTRING_API FHString fhstring_make(void *allocator, fhstring_i32 length);
 FHSTRING_API FHString_Builder fhstring_builder_make(void *allocator, fhstring_i32 capacity);
 
 // NOTE(Patrik): GROW
-FHSTRING_API fhstring_error fhstring_grow(void *allocator, FHString *buffer, fhstring_i32 length);
+FHSTRING_API fhstring_error fhstring_grow(FHString_Allocator *allocator, FHString *buffer, fhstring_i32 length);
 FHSTRING_API fhstring_error fhstring_builder_grow(FHString_Builder *buffer, fhstring_i32 capacity);
 FHSTRING_API fhstring_error fhstring_builder_maybe_grow(FHString_Builder *buffer, fhstring_i32 new_capacity);
 
@@ -171,11 +197,11 @@ FHSTRING_API fhstring_error fhstring_null_terminate(FHString_Builder *builder);
 #endif
 
 // NOTE(Patrik): COPY
-FHSTRING_API FHString fhstring_copy(void *allocator, FHString it);
-FHSTRING_API FHString_Builder fhstring_builder_copy(void *allocator, FHString_Builder it);
+FHSTRING_API FHString fhstring_copy(FHString_Allocator *allocator, FHString it);
+FHSTRING_API FHString_Builder fhstring_builder_copy(FHString_Allocator *allocator, FHString_Builder it);
 
 #if defined(__cplusplus)
-FHSTRING_API FHString_Builder fhstring_copy(void *allocator, FHString_Builder it);
+FHSTRING_API FHString_Builder fhstring_copy(FHString_Allocator *allocator, FHString_Builder it);
 #endif
 
 // NOTE(Patrik): INSERT AT
@@ -629,8 +655,24 @@ FHSTRING_API fhstring_i32 fhstring_last_index_of(FHString_Builder a, FHString_Bu
 #endif
 
 // NOTE(Patrik): STRING ID
+FHSTRING_API FHString_ID_State fhstring_id_state_set(FHString_Builder allocated_text, FHString_Allocator *allocator, FHString_ID_Entry *entries, fhstring_i32 entry_count, fhstring_i32 entry_capacity, FHString_ID last_used_id);
+FHSTRING_API FHString_ID_Entry fhstring_id_entry_set(FHString_ID id, fhstring_i64 offset, fhstring_i32 length);
+
 FHSTRING_API fhstring_bool fhstring_id_exists(FHString_ID_State state, FHString_ID id);
 FHSTRING_API fhstring_i32 fhstring_id_remove(FHString_ID_State *state, FHString_ID id);
+
+FHSTRING_API fhstring_i32 fhstring_id_get_index(FHString_ID_State state, FHString_ID id);
+FHSTRING_API fhstring_i32 fhstring_id_get_index_from_many(FHString_ID_State state, const char *it_data, fhstring_i32 it_length);
+FHSTRING_API fhstring_i32 fhstring_id_get_index_from_ntstring(FHString_ID_State state, const char *it);
+FHSTRING_API fhstring_i32 fhstring_id_get_index_from_string(FHString_ID_State state, FHString it);
+FHSTRING_API fhstring_i32 fhstring_id_get_index_from_builder(FHString_ID_State state, FHString_Builder it);
+
+#if defined(__cplusplus)
+FHSTRING_API fhstring_i32 fhstring_id_get_index(FHString_ID_State state, const char *it_data, fhstring_i32 it_length);
+FHSTRING_API fhstring_i32 fhstring_id_get_index(FHString_ID_State state, const char *it);
+FHSTRING_API fhstring_i32 fhstring_id_get_index(FHString_ID_State state, FHString it);
+FHSTRING_API fhstring_i32 fhstring_id_get_index(FHString_ID_State state, FHString_Builder it);
+#endif
 
 FHSTRING_API FHString_ID fhstring_id_from_many(FHString_ID_State state, const char *it_data, fhstring_i32 it_length);
 FHSTRING_API FHString_ID fhstring_id_from_ntstring(FHString_ID_State state, const char *it);
@@ -664,7 +706,7 @@ FHSTRING_API FHString_ID fhstring_id_add(FHString_ID_State *state, FHString_Buil
 enum {
     FHSTRING_ERROR_NONE = 0,
     FHSTRING_ERROR_UNDOCUMENTED_ERROR = -1,
-    FHSTRING_ERROR_PATTERN_NOT_FOUND = -2,
+    FHSTRING_ERROR_INDEX_NOT_FOUND = -2,
     FHSTRING_ERROR_ARGUMENT_A_DATA_IS_NULL = -3,
     FHSTRING_ERROR_ARGUMENT_A_LENGTH_IS_EMPTY = -4,
     FHSTRING_ERROR_ARGUMENT_B_DATA_IS_NULL = -5,
@@ -680,6 +722,8 @@ enum {
     FHSTRING_ERROR_INPUT_BUFFER_IS_EMPTY = -15,
     FHSTRING_ERROR_TRYING_TO_ALLOCATE_ZERO_BYTES_OR_LESS = -16,
     FHSTRING_ERROR_RAN_OUT_OF_MEMORY = -17,
+    FHSTRING_ERROR_STRING_ID_STATE_IS_NULL = -18,
+    FHSTRING_ERROR_STRING_ID_STATE_IS_EMPTY = -19,
 };
 
 
@@ -742,7 +786,7 @@ fhstring_set_from_builder(FHString_Builder it) {
 
 
 FHSTRING_API FHString_Builder
-fhstring_builder_set(void *allocator, const char *it_data, fhstring_i32 it_length, fhstring_i32 it_capacity) {
+fhstring_builder_set(FHString_Allocator *allocator, const char *it_data, fhstring_i32 it_length, fhstring_i32 it_capacity) {
     FHString_Builder result = {0};
     result.allocator = allocator;
     result.data = (char *)it_data;
@@ -775,7 +819,7 @@ fhstring_builder_set_from_fhstring(FHString it) {
 // MAKE
 //
 FHSTRING_API FHString
-fhstring_make(void *allocator, fhstring_i32 length) {
+fhstring_make(FHString_Allocator *allocator, fhstring_i32 length) {
     FHString result = {0};
     if(length <= 0) { return result; }
     
@@ -785,7 +829,7 @@ fhstring_make(void *allocator, fhstring_i32 length) {
 }
 
 FHSTRING_API FHString_Builder
-fhstring_builder_make(void *allocator, fhstring_i32 capacity) {
+fhstring_builder_make(FHString_Allocator *allocator, fhstring_i32 capacity) {
     FHString_Builder result = {0};
     if(capacity <= 0) { return result; }
     
@@ -802,7 +846,7 @@ fhstring_builder_make(void *allocator, fhstring_i32 capacity) {
 // GROW
 //
 FHSTRING_API fhstring_error
-fhstring_grow(void *allocator, FHString *buffer, fhstring_i32 length) {
+fhstring_grow(FHString_Allocator *allocator, FHString *buffer, fhstring_i32 length) {
     if(!buffer) { return FHSTRING_ERROR_INPUT_BUFFER_IS_NULL; }
     if(length <= 0) { return FHSTRING_ERROR_TRYING_TO_ALLOCATE_ZERO_BYTES_OR_LESS; }
     
@@ -878,7 +922,7 @@ fhstring_maybe_grow(FHString_Builder *buffer, fhstring_i32 new_capacity) {
 // COPY
 //
 FHSTRING_API FHString
-fhstring_copy(void *allocator, FHString it) {
+fhstring_copy(FHString_Allocator *allocator, FHString it) {
     FHString result = fhstring_make(allocator, it.length + 1);
     
     result.length = it.length;
@@ -888,7 +932,7 @@ fhstring_copy(void *allocator, FHString it) {
 }
 
 FHSTRING_API FHString_Builder
-fhstring_builder_copy(void *allocator, FHString_Builder it) {
+fhstring_builder_copy(FHString_Allocator *allocator, FHString_Builder it) {
     FHString_Builder result = fhstring_builder_make(allocator, it.length + 1);
     
     result.length = it.length;
@@ -898,7 +942,7 @@ fhstring_builder_copy(void *allocator, FHString_Builder it) {
 }
 #if defined(__cplusplus)
 FHSTRING_API FHString_Builder
-fhstring_copy(void *allocator, FHString_Builder it) {
+fhstring_copy(FHString_Allocator *allocator, FHString_Builder it) {
     return fhstring_builder_copy(allocator, it);
 }
 #endif
@@ -2973,7 +3017,7 @@ fhstring_many_index_of_char(const char *a_data, fhstring_i32 a_length, char b) {
     for(fhstring_i32 i = 0; i < a_length; i += 1) {
         if(a_data[i] == b) { return i; }
     }
-    return FHSTRING_ERROR_PATTERN_NOT_FOUND;
+    return FHSTRING_ERROR_INDEX_NOT_FOUND;
 }
 #if defined(__cplusplus)
 FHSTRING_API fhstring_i32
@@ -3000,7 +3044,7 @@ fhstring_many_index_of(const char *a_data, fhstring_i32 a_length, const char *b_
         
         if(found) { return a_index; }
     }
-    return FHSTRING_ERROR_PATTERN_NOT_FOUND;
+    return FHSTRING_ERROR_INDEX_NOT_FOUND;
 }
 #if defined(__cplusplus)
 FHSTRING_API fhstring_i32
@@ -3229,7 +3273,7 @@ fhstring_many_last_index_of_char(const char *a_data, fhstring_i32 a_length, char
     for(fhstring_i32 i = a_length - 1; i >= 0; i -= 1) {
         if(a_data[i] == b) { return i; }
     }
-    return FHSTRING_ERROR_PATTERN_NOT_FOUND;
+    return FHSTRING_ERROR_INDEX_NOT_FOUND;
 }
 #if defined(__cplusplus)
 FHSTRING_API fhstring_i32
@@ -3256,7 +3300,7 @@ fhstring_many_last_index_of(const char *a_data, fhstring_i32 a_length, const cha
         
         if(found) { return a_index; }
     }
-    return FHSTRING_ERROR_PATTERN_NOT_FOUND;
+    return FHSTRING_ERROR_INDEX_NOT_FOUND;
 }
 #if defined(__cplusplus)
 FHSTRING_API fhstring_i32
@@ -3475,6 +3519,317 @@ fhstring_last_index_of(FHString_Builder a, FHString_Builder b) {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
+// STRING ID
+//
+FHSTRING_API FHString_ID_State
+fhstring_id_state_set(FHString_Builder allocated_text, FHString_Allocator *allocator,
+                      FHString_ID_Entry *entries, fhstring_i32 entry_count, fhstring_i32 entry_capacity,
+                      FHString_ID last_used_id)
+{
+    FHString_ID_State result = {0};
+    result.allocated_text = allocated_text;
+    result.allocator = allocator;
+    result.entries = entries;
+    result.entry_count = entry_count;
+    result.entry_capacity = entry_capacity;
+    result.last_used_id = last_used_id;
+    return result;
+}
+
+FHSTRING_API FHString_ID_Entry
+fhstring_id_entry_set(FHString_ID id, fhstring_i64 offset, fhstring_i32 length) {
+    FHString_ID_Entry result = {0};
+    result.id = id;
+    result.offset = offset;
+    result.length = length;
+    return result;
+}
+
+//
+
+FHSTRING_API fhstring_bool
+fhstring_id_exists(FHString_ID_State state, FHString_ID id) {
+    if(id == 0) { return FHSTRING_FALSE; }
+    if(state.entry_count <= 0) { return FHSTRING_FALSE; }
+    
+    for(fhstring_i32 i = 0; i < state.entry_count; i += 1) {
+        FHString_ID_Entry *entry = state.entries + i;
+        
+        if(entry->id == id) { return FHSTRING_TRUE; }
+    }
+    return FHSTRING_FALSE;
+}
+
+FHSTRING_API fhstring_i32
+fhstring_id_remove(FHString_ID_State *state, FHString_ID id) {
+    if(id == 0) { return FHSTRING_ERROR_INDEX_NOT_FOUND; }
+    if(!state) { return FHSTRING_ERROR_STRING_ID_STATE_IS_NULL; }
+    
+    fhstring_i32 index = fhstring_id_get_index(*state, id);
+    if(index >= 0) {
+        FHString_ID_Entry *remove_entry = state->entries + index;
+        
+        for(fhstring_i32 i = 0; i < state->entry_count; i += 1) {
+            if(index == i) { continue; }
+            FHString_ID_Entry *entry = state->entries + i;
+            if(entry->offset >= remove_entry->offset) { entry->offset -= remove_entry->length; }
+        }
+        
+        state->entries[index] = state->entries[state->entry_count - 1];
+        state->entry_count -= 1;
+    }
+    return index;
+}
+
+//
+
+FHSTRING_API fhstring_i32
+fhstring_id_get_index(FHString_ID_State state, FHString_ID id) {
+    if(id == 0) { return FHSTRING_ERROR_INDEX_NOT_FOUND; }
+    if(state.entry_count <= 0) { return FHSTRING_ERROR_STRING_ID_STATE_IS_EMPTY; }
+    
+    for(fhstring_i32 i = 0; i < state.entry_count; i += 1) {
+        FHString_ID_Entry *entry = state.entries + i;
+        
+        if(entry->id == id) { return i; }
+    }
+    return FHSTRING_ERROR_INDEX_NOT_FOUND;
+}
+
+FHSTRING_API fhstring_i32
+fhstring_id_get_index_from_many(FHString_ID_State state, const char *it_data, fhstring_i32 it_length) {
+    if(!it_data) { return FHSTRING_ERROR_IT_DATA_IS_NULL; }
+    if(it_length <= 0) { return FHSTRING_ERROR_IT_LENGTH_IS_EMPTY; }
+    if(state.entry_count <= 0) { return FHSTRING_ERROR_STRING_ID_STATE_IS_EMPTY; }
+    
+    for(fhstring_i32 i = 0; i < state.entry_count; i += 1) {
+        FHString_ID_Entry *entry = state.entries + i;
+        
+        char *data = state.allocated_text.data + entry->offset;
+        fhstring_bool found = fhstring_many_eq(data, entry->length, it_data, it_length);
+        if(found) { return entry->id; }
+    }
+    return FHSTRING_ERROR_INDEX_NOT_FOUND;
+}
+#if defined(__cplusplus)
+FHSTRING_API fhstring_i32
+fhstring_id_get_index(FHString_ID_State state, const char *it_data, fhstring_i32 it_length) {
+    return fhstring_id_get_index_from_many(state, it_data, it_length);
+}
+#endif
+
+FHSTRING_API fhstring_i32
+fhstring_id_get_index_from_ntstring(FHString_ID_State state, const char *it) {
+    fhstring_i32 it_length = fhstring_get_ntstring_length(it);
+    return fhstring_id_get_index_from_many(state, it, it_length);
+}
+#if defined(__cplusplus)
+FHSTRING_API fhstring_i32
+fhstring_id_get_index(FHString_ID_State state, const char *it) {
+    return fhstring_id_get_index_from_ntstring(state, it);
+}
+#endif
+
+FHSTRING_API fhstring_i32
+fhstring_id_get_index_from_string(FHString_ID_State state, FHString it) {
+    return fhstring_id_get_index_from_many(state, it.data, it.length);
+}
+#if defined(__cplusplus)
+FHSTRING_API fhstring_i32
+fhstring_id_get_index(FHString_ID_State state, FHString it) {
+    return fhstring_id_get_index_from_string(state, it);
+}
+#endif
+
+FHSTRING_API fhstring_i32
+fhstring_id_get_index_from_builder(FHString_ID_State state, FHString_Builder it) {
+    return fhstring_id_get_index_from_many(state, it.data, it.length);
+}
+#if defined(__cplusplus)
+FHSTRING_API fhstring_i32
+fhstring_id_get_index(FHString_ID_State state, FHString_Builder it) {
+    return fhstring_id_get_index_from_builder(state, it);
+}
+#endif
+
+//
+
+FHSTRING_API FHString_ID
+fhstring_id_from_many(FHString_ID_State state, const char *it_data, fhstring_i32 it_length) {
+    if(!it_data) { return 0; }
+    if(it_length <= 0) { return 0; }
+    if(state.entry_count <= 0) { return 0; }
+    
+    fhstring_i32 index = fhstring_id_get_index_from_many(state, it_data, it_length);
+    if(index >= 0) {
+        FHString_ID_Entry *entry = state.entries + index;
+        return entry->id;
+    }
+    return 0;
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_get(FHString_ID_State state, const char *it_data, fhstring_i32 it_length) {
+    return fhstring_id_from_many(state, it_data, it_length);
+}
+#endif
+
+FHSTRING_API FHString_ID
+fhstring_id_from_ntstring(FHString_ID_State state, const char *it) {
+    fhstring_i32 it_length = fhstring_get_ntstring_length(it);
+    return fhstring_id_from_many(state, it, it_length);
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_get(FHString_ID_State state, const char *it) {
+    return fhstring_id_from_ntstring(state, it);
+}
+#endif
+
+FHSTRING_API FHString_ID
+fhstring_id_from_string(FHString_ID_State state, FHString it) {
+    return fhstring_id_from_many(state, it.data, it.length);
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_get(FHString_ID_State state, FHString it) {
+    return fhstring_id_from_string(state, it);
+}
+#endif
+
+FHSTRING_API FHString_ID
+fhstring_id_from_builder(FHString_ID_State state, FHString_Builder it) {
+    return fhstring_id_from_many(state, it.data, it.length);
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_get(FHString_ID_State state, FHString_Builder it) {
+    return fhstring_id_from_builder(state, it);
+}
+#endif
+
+//
+
+FHSTRING_API FHString_ID
+fhstring_id_add_from_many(FHString_ID_State *state, const char *it_data, fhstring_i32 it_length) {
+    if(!state) { return 0; }
+    if(!it_data) { return 0; }
+    if(it_length) { return 0; }
+    
+    fhstring_i32 find_index = fhstring_id_get_index_from_many(*state, it_data, it_length);
+    if(find_index >= 0) { return state->entries[find_index].id; }
+    
+    state->last_used_id += 1;
+    
+    FHString_ID_Entry entry = {0};
+    entry.id = state->last_used_id;
+    entry.offset = (fhstring_i64)(state->allocated_text.data + state->allocated_text.length);
+    entry.length = it_length;
+    
+    fhstring_builder_append_many(&state->allocated_text, it_data, it_length);
+    fhstring_builder_append(&state->allocated_text, '\0');
+    
+    if(state->entry_capacity <= 0) { state->entry_capacity = FHSTRING_DEFAULT_ID_STATE_CAPACITY; }
+    while(state->entry_capacity < state->entry_count + 1) { state->entry_capacity *= 2; }
+    
+    if(state->entries) {
+        state->entries = (FHString_ID_Entry *)FHSTRING_REALLOC(state->allocator, state->entries,
+                                                               sizeof(FHString_ID_Entry) * state->entry_count);
+    } else {
+        state->entries = (FHString_ID_Entry *)FHSTRING_ALLOC(state->allocator,
+                                                             sizeof(FHString_ID_Entry) * state->entry_count);
+    }
+    
+    state->entries[state->entry_count] = entry;
+    state->entry_count += 1;
+    
+    return entry.id;
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_add(FHString_ID_State *state, const char *it_data, fhstring_i32 it_length) {
+    return fhstring_id_add_from_many(state, it_data, it_length);
+}
+#endif
+
+FHSTRING_API FHString_ID
+fhstring_id_add_from_ntstring(FHString_ID_State *state, const char *it) {
+    fhstring_i32 it_length = fhstring_get_ntstring_length(it);
+    return fhstring_id_add_from_many(state, it, it_length);
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_add(FHString_ID_State *state, const char *it) {
+    return fhstring_id_add_from_ntstring(state, it);
+}
+#endif
+
+FHSTRING_API FHString_ID
+fhstring_id_add_from_string(FHString_ID_State *state, FHString it) {
+    return fhstring_id_add_from_many(state, it.data, it.length);
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_add(FHString_ID_State *state, FHString it) {
+    return fhstring_id_add_from_string(state, it);
+}
+#endif
+
+FHSTRING_API FHString_ID
+fhstring_id_add_from_builder(FHString_ID_State *state, FHString_Builder it) {
+    return fhstring_id_add_from_many(state, it.data, it.length);
+}
+#if defined(__cplusplus)
+FHSTRING_API FHString_ID
+fhstring_id_add(FHString_ID_State *state, FHString_Builder it) {
+    return fhstring_id_add_from_builder(state, it);
+}
+#endif
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
 // END IMPLEMENTATION GUARD
 //
 #endif
+
+
+/*
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2025 Patrik Johansson
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
