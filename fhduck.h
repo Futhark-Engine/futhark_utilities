@@ -6,8 +6,8 @@
 //
 // BEGIN INCLUDE GUARD
 //
-#if !defined(FHDUCK_ARRAY_H)
-#define FHDUCK_ARRAY_H
+#if !defined(FHDUCK_H)
+#define FHDUCK_H
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -673,6 +673,20 @@ if((this)->count >= 1) {\
 }\
 } while(0)
 
+#define fhduckl_remove_unordered_range(this, start_index, it_length) do {\
+if((start_index) >= 0) {\
+for(ptrdiff_t _fhduck_i_ = (start_index) + ((it_length) - 1);\
+_fhduck_i_ >= (start_index);\
+_fhduck_i_ -= 1)\
+{\
+(this)->data[_fhduck_i_] = (this)->data[((this)->count) - 1];\
+(this)->count -= 1;\
+}\
+}\
+} while(0)
+
+//
+
 #define fhduckl_remove_ordered(this, index) do {\
 if((this)->count >= 1 && (index) < (this)->count) {\
 if((index) > 0) {\
@@ -691,6 +705,22 @@ _fhduck_i_ += 1)\
 }\
 }\
 (this)->count -= 1;\
+}\
+} while(0)
+
+#define fhduckl_remove_ordered_range(this, start_index, it_length) do {\
+if((start_index) >= 0 && (start_index) < (this)->count) {\
+for(ptrdiff_t _fhduck_i_ = ((start_index) + (it_length));\
+_fhduck_i_ < (this)->count;\
+_fhduck_i_ += 1)\
+{\
+(this)->data[_fhduck_i_ - (it_length)] = (this)->data[_fhduck_i_];\
+}\
+if(((start_index) + (it_length)) >= (this)->count) {\
+(this)->count -= ((start_index) + (it_length)) - (this)->count;\
+} else {\
+(this)->count -= (it_length);\
+}\
 }\
 } while(0)
 

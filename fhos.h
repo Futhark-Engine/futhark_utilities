@@ -21,23 +21,10 @@
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// INCLUDES
-//
-#if !defined(FHOS_DO_NOT_INCLUDE_PLATFORM_HEADERS)
-#  if defined(_WIN32) || defined(_WIN64)
-#    include <windows.h>
-#  else
-#    error Unimplemented platform.
-#  endif
-#endif
-
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
 // CONFIG
 //
 #if !defined(FHOS_API)
-#  define FHOS_API static
+#  define FHOS_API
 #endif
 
 #if !defined(FHOS_DEFAULT_BUFFER_CAPACITY)
@@ -56,6 +43,7 @@
 #  if defined(FUTHARK_LOG)
 #    define FHOS_LOG_ERROR(format, ...) FUTHARK_LOG(ERROR, format, __VA_ARGS__)
 #  else
+#    include <stdio.h>
 #    define FHOS_LOG_ERROR(format, ...) printf(__FILE__ "(%d): [ERROR] " format, __LINE__, __VA_ARGS__)
 #  endif
 #endif
@@ -65,6 +53,12 @@
 //
 // MACROS
 //
+#define FHOS_I8_MAX  0x7F
+#define FHOS_I16_MAX 0x7FFF
+#define FHOS_I32_MAX 0x7FFFFFFF
+
+//
+
 #define FHOS_FIELD_ALIAS(T, ...) union { T __VA_ARGS__; }
 
 //
@@ -149,29 +143,33 @@ enum {
 };
 
 #if !defined(FHOS_NO_STDINT)
-// NOTE(Patrik): Negative values indicate an error.
-// Other values depend on the function
-typedef int32_t fhos_error;
-
-// NOTE(Patrik): Only used internally
-typedef ptrdiff_t fhos_isize;
-
-typedef int8_t    fhos_bool;
+#  include <stdint.h>
+typedef ptrdiff_t fhos_isize; // NOTE(Patrik): Only used internally
 typedef uint8_t   fhos_u8;
+typedef uint16_t  fhos_u16;
+typedef uint32_t  fhos_u32;
+typedef uint64_t  fhos_u64;
 typedef int8_t    fhos_i8;
 typedef int16_t   fhos_i16;
 typedef int32_t   fhos_i32;
 typedef int64_t   fhos_i64;
 #else
-typedef signed int       fhos_error;
-typedef signed long long fhos_isize;
-typedef signed char      fhos_bool;
-typedef unsigned char    fhos_u8;
-typedef signed char      fhos_i8;
-typedef signed short     fhos_i16;
-typedef signed int       fhos_i32;
-typedef signed long long fhos_i64;
+typedef signed long long   fhos_isize; // NOTE(Patrik): Only used internally
+typedef unsigned char      fhos_u8;
+typedef unsigned short     fhos_u16;
+typedef unsigned int       fhos_u32;
+typedef unsigned long long fhos_u64;
+typedef signed char        fhos_i8;
+typedef signed short       fhos_i16;
+typedef signed int         fhos_i32;
+typedef signed long long   fhos_i64;
 #endif
+
+typedef fhos_u8 fhos_bool;
+
+// NOTE(Patrik): Negative values indicate an error.
+// Other values depend on the function
+typedef fhos_i32 fhos_error;
 
 #if defined(Futhark_File_Handle)
 typedef Futhark_File_Handle FHOS_File_Handle;
@@ -223,6 +221,23 @@ typedef struct FHOS_Context {
 } FHOS_Context;
 
 #  define FHOS_Context(...) fhos_set_context(__VA_ARGS__)
+#endif
+
+#if defined(Futhark_Date_And_Time)
+typedef Futhark_Date_And_Time FHOS_Date_And_Time;
+#elif !defined(FHOS_Date_And_Time)
+typedef struct FHOS_Date_And_Time {
+    fhos_u32 year;
+    fhos_u16 milliseconds;
+    fhos_u8  month;
+    fhos_u8  day;
+    fhos_u8  weekday;
+    fhos_u8  hour;
+    fhos_u8  minutes;
+    fhos_u8  seconds;
+} FHOS_Date_And_Time;
+
+#  define FHOS_Date_And_Time(...) fhos_get_date_and_time(__VA_ARGS__)
 #endif
 
 
@@ -322,6 +337,14 @@ FHOS_API fhos_error fhos_remove_directory_recursively(FHOS_Context *ctx, const c
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
+// TIME
+//
+FHOS_API FHOS_Date_And_Time fhos_get_date_and_time(void);
+FHOS_API fhos_u64 fhos_get_unix_timestamp(void);
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
 // ERROR CODES
 //
 enum {
@@ -350,6 +373,19 @@ enum {
 //
 #if defined(FHOS_IMPLEMENTATION) && !defined(FHOS_IMPLEMENTATION_DONE)
 #  define FHOS_IMPLEMENTATION_DONE
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// INCLUDES
+//
+#if !defined(FHOS_DO_NOT_INCLUDE_PLATFORM_HEADERS)
+#  if defined(_WIN32) || defined(_WIN64)
+#    include <windows.h>
+#  else
+#    error Unimplemented platform.
+#  endif
+#endif
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -864,8 +900,8 @@ fhos_read_file(FHOS_Context *ctx, FHOS_File_Handle handle, fhos_u8 *data, fhos_i
 #if defined(_WIN32) || defined(_WIN64)
     DWORD bytes_read = 0;
     
-    if(read_amount > I32_MAX) {
-        if(!ReadFile((HANDLE)handle.data, data, I32_MAX, &bytes_read, 0)) {
+    if(read_amount > FHOS_I32_MAX) {
+        if(!ReadFile((HANDLE)handle.data, data, FHOS_I32_MAX, &bytes_read, 0)) {
             FHOS_LOG_ERROR("Could not read file. (%lu)\n", GetLastError());
             return -1;
         }
@@ -912,8 +948,8 @@ fhos_write_file(FHOS_File_Handle handle, const fhos_u8 *data, fhos_i64 write_amo
 #if defined(_WIN32) || defined(_WIN64)
     DWORD bytes_written = 0;
     
-    if(write_amount > I32_MAX) {
-        if(!WriteFile((HANDLE)handle.data, data, I32_MAX, &bytes_written, 0)) {
+    if(write_amount > FHOS_I32_MAX) {
+        if(!WriteFile((HANDLE)handle.data, data, FHOS_I32_MAX, &bytes_written, 0)) {
             FHOS_LOG_ERROR("Could not to write file. (%lu)\n", GetLastError());
             return -1;
         }
@@ -1017,7 +1053,7 @@ fhos_remove_file(FHOS_Context *ctx, const char *path_data, fhos_i32 path_length)
     if(!success) {
         DWORD last_error = GetLastError();
         if(last_error != ERROR_FILE_NOT_FOUND) {
-            FUTHARK_LOG(ERROR, "Could not delete the file \"%s\". (%lu)\n", path, last_error);
+            FHOS_LOG_ERROR("Could not delete the file \"%s\". (%lu)\n", path, last_error);
         }
     }
     
@@ -1141,10 +1177,62 @@ fhos_is_file_newer(FHOS_Context *ctx, const char *this_path_data, fhos_i32 this_
     }
     
     FHOS__ALLOC_FROM_TO_PATH(ctx, this_path_data, this_path_length, other_path_data, other_path_length);
-    if(!this_path) {
+    if(!this_path_data) {
         FHOS_LOG_ERROR("Could not allocate memory for the path.\n");
         return -1;
     }
+    
+    HANDLE other_handle = CreateFileA(to_path, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, 0);
+    if(other_handle == INVALID_HANDLE_VALUE) {
+        FHOS__FREE_FROM_TO_PATH(ctx, this_path_data, this_path_length, other_path_data, other_path_length);
+        
+        DWORD last_error = GetLastError();
+        if(last_error != ERROR_FILE_NOT_FOUND) {
+            FHOS_LOG_ERROR("Could not open other_path..\n");
+            return -1;
+        }
+        return FHOS_TRUE;
+    }
+    
+    HANDLE this_handle = CreateFileA(from_path, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, 0);
+    if(this_handle == INVALID_HANDLE_VALUE) {
+        DWORD last_error = GetLastError();
+        FHOS__FREE_FROM_TO_PATH(ctx, this_path_data, this_path_length, other_path_data, other_path_length);
+        
+        if(last_error != ERROR_FILE_NOT_FOUND) {
+            FHOS_LOG_ERROR("Could not open this_path..\n");
+            return -1;
+        }
+        return FHOS_TRUE;
+    }
+    
+    FILETIME other_time = {0};
+    if(!GetFileTime(to_path, 0, 0, &other_time)) {
+        DWORD last_error = GetLastError();
+        FHOS__FREE_FROM_TO_PATH(ctx, this_path_data, this_path_length, other_path_data, other_path_length);
+        
+        FHOS_LOG_ERROR("Could not get filetime of other_path.\n");
+        CloseHandle(this_handle);
+        CloseHandle(other_handle);
+        return -1;
+    }
+    
+    FILETIME this_time = {0};
+    if(!GetFileTime(from_path, 0, 0, &this_time)) {
+        DWORD last_error = GetLastError();
+        FHOS__FREE_FROM_TO_PATH(ctx, this_path_data, this_path_length, other_path_data, other_path_length);
+        
+        FHOS_LOG_ERROR("Could not get filetime of this_path.\n");
+        CloseHandle(this_handle);
+        CloseHandle(other_handle);
+        return -1;
+    }
+    
+    FHOS__FREE_FROM_TO_PATH(ctx, this_path_data, this_path_length, other_path_data, other_path_length);
+    CloseHandle(this_handle);
+    CloseHandle(other_handle);
+    
+    return (CompareFileTime(&this_time, &other_time) > 0);
 }
 
 //
@@ -1339,6 +1427,53 @@ fhos_remove_directory_recursively(FHOS_Context *ctx, const char *path_data, fhos
     
     fhos_context_temp_free(ctx, path.data);
     return error;
+#else
+#  error Unimplemented on this platform.
+#endif
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// TIME
+//
+FHOS_API FHOS_Date_And_Time
+fhos_get_date_and_time(void) {
+    FHOS_Date_And_Time result = {0};
+    
+#if defined(_WIN32) || defined(_WIN64)
+    SYSTEMTIME system = {0};
+    GetSystemTime(&system);
+    
+    result.year         = (fhos_u32)system.wYear;
+    result.milliseconds = (fhos_u16)system.wMilliseconds;
+    result.month        = (fhos_u8)system.wMonth;
+    result.day          = (fhos_u8)system.wDay;
+    result.weekday      = (fhos_u8)system.wDayOfWeek;
+    result.hour         = (fhos_u8)system.wHour;
+    result.minutes      = (fhos_u8)system.wMinute;
+    result.seconds      = (fhos_u8)system.wSecond;
+#else
+#  error Unimplemented on this platform.
+#endif
+    
+    return result;
+}
+
+FHOS_API fhos_u64
+fhos_get_unix_timestamp(void) {
+#if defined(_WIN32) || defined(_WIN64)
+    fhos_u64 unix_time_start = 0x019DB1DED53E8000ULL;
+    fhos_u64 ticks_per_second = 10000000;
+    
+    FILETIME file_time;
+    GetSystemTimeAsFileTime(&file_time);
+    
+    LARGE_INTEGER large;
+    large.LowPart = file_time.dwLowDateTime;
+    large.HighPart = file_time.dwHighDateTime;
+    
+    return (large.QuadPart - unix_time_start) / ticks_per_second;
 #else
 #  error Unimplemented on this platform.
 #endif
