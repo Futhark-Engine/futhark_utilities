@@ -70,7 +70,7 @@ typedef union FHRandom {
 //
 FHRANDOM_API FHRandom fhrandom_seed(fhrandom_u32 e0, fhrandom_u32 e1, fhrandom_u32 e2, fhrandom_u32 e3);
 FHRANDOM_API FHRandom fhrandom_seed_default(void);
-FHRANDOM_API FHRandom fhrandom_seed_from_date(u32 year, u8 month, u8 day, u8 hour, u8 minutes, u8 seconds, u16 milliseconds);
+FHRANDOM_API FHRandom fhrandom_seed_from_date(fhrandom_u32 year, fhrandom_u8 month, fhrandom_u8 day, fhrandom_u8 hour, fhrandom_u8 minutes, fhrandom_u8 seconds, fhrandom_u16 milliseconds);
 
 FHRANDOM_API void fhrandom_next(FHRandom *seed);
 FHRANDOM_API fhrandom_u8 fhrandom_next_u8(FHRandom *seed);

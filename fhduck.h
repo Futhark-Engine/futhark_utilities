@@ -62,13 +62,8 @@ Index_T capacity
 
 // TODO(Patrik): Move these?
 
-#define ARRAY(Index_T, Element_T) struct ____ {\
-FHDUCK_ARRAY(Index_T, Element_T);\
-}
-
-#define LIST(Index_T, Element_T) struct ____ {\
-FHDUCK_LIST(Index_T, Element_T);\
-}
+#define ARRAY(Index_T, Element_T) struct { FHDUCK_ARRAY(Index_T, Element_T); }
+#define LIST(Index_T, Element_T) struct { FHDUCK_LIST(Index_T, Element_T); }
 
 #define ARRAYN(N, Index_T, ...) ARRAY##N(Index_T, __VA_ARGS__)
 #define LISTN(N, Index_T, ...) LIST##N(Index_T, __VA_ARGS__)
